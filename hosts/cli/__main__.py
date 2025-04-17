@@ -89,3 +89,24 @@ async def complete_task(client, streaming, use_push_notification, notif_receiver
                 "schemes": ["bearer"]
             }
         }
+
+    taskResult = None
+    if streaming:
+        response_stream = client.send_task_streaming(payload)
+        async for result in response_stream:
+            print(f"stram event => {result.model_dump_json(exclude_none=True)}")
+        taskResult = await client.get_task({"id": task_id})
+    else:
+        taskResult = await client.send_task(payload)
+        print(f"task result => {taskResult.model_dump_json(exclude_none=True)}")
+
+    state = TaskState(taskResult.result.status.state)
+    if state.name == TaskState.INPUT_REQUIRED.name:
+        return await complete_task(client, streaming, use_push_notification, notif_receiver_host, notif_receiver_port,
+                                   task_id, session_id)
+    else:
+        return True
+
+
+if __name__ == '__main__':
+    asyncio.run(cli())
