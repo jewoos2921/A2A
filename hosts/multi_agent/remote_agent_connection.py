@@ -13,7 +13,7 @@ from common.types import (
 from common.client import A2AClient
 
 TaskCallbackArg = Task | TaskStatusUpdateEvent | TaskArtifactUpdateEvent
-TaskUpdateCallback = Callable[[TaskCallbackArg], Task]
+TaskUpdateCallback = Callable[[TaskCallbackArg, AgentCard], Task]
 
 
 class RemoteAgentConnections:
@@ -28,7 +28,8 @@ class RemoteAgentConnections:
     def get_agent(self) -> AgentCard:
         return self.card
 
-    async def send_task(self, request: TaskSendParams,
+    async def send_task(self,
+                        request: TaskSendParams,
                         task_callback: TaskUpdateCallback | None) -> Task | None:
         if self.card.capabilities.streaming:
             task = None
@@ -41,7 +42,7 @@ class RemoteAgentConnections:
                         message=request.message,
                     ),
                     history=[request.message]
-                ))
+                ), self.card)
 
             async for response in self.agent_client.send_task_streaming(request.model_dump()):
                 merge_metadata(response.result, request)
@@ -58,7 +59,7 @@ class RemoteAgentConnections:
                     m.meta_data['message_id'] = str(uuid.uuid4())
 
                 if task_callback:
-                    task_callback(response.result)
+                    task_callback(response.result, self.card)
                 if hasattr(response.result, "final") and response.result.final:
                     break
             return task
